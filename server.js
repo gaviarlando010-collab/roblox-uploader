@@ -34,11 +34,23 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
       creationContext: { creator },
     };
 
+    // Roblox mewajibkan MIME type spesifik untuk file rbxm/rbxmx,
+    // "application/octet-stream" generik akan ditolak.
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const mimeMap = {
+      ".rbxm": "model/x-rbxm",
+      ".rbxmx": "model/x-rbxmx",
+    };
+    const contentType = mimeMap[ext];
+    if (!contentType) {
+      return res.status(400).json({ error: "File harus berformat .rbxm atau .rbxmx." });
+    }
+
     const form = new FormData();
     form.append("request", JSON.stringify(requestPayload));
     form.append(
       "fileContent",
-      new Blob([req.file.buffer]),
+      new Blob([req.file.buffer], { type: contentType }),
       req.file.originalname
     );
 
