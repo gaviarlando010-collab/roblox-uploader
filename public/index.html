@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Uploader &mdash; Roblox Open Cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0e1013;
+    --panel: #16191f;
+    --panel-2: #1c2029;
+    --border: #262b35;
+    --text: #e9e7e2;
+    --text-dim: #8b90a0;
+    --accent: #5fe0c9;
+    --accent-dim: #2c4c47;
+    --warn: #f2a65a;
+    --err: #ef6a6a;
+    --radius: 10px;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height:100vh;
+  }
+  .wrap{
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom: 36px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .brand{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+  }
+  .brand span{ color: var(--accent); }
+  .sub{
+    color: var(--text-dim);
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 24px;
+  }
+  @media (max-width: 860px){ .grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .panel h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0 0 20px;
+  }
+  label{
+    display:block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .field{ margin-bottom: 18px; }
+  input[type=text], input[type=password], input[type=number], textarea, select{
+    width:100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+  }
+  input:focus, textarea:focus, select:focus{
+    border-color: var(--accent);
+  }
+  textarea{ resize: vertical; min-height: 60px; font-family:'Inter',sans-serif; }
+  .row{ display:flex; gap: 12px; }
+  .row > div{ flex:1; }
+
+  .toggle{
+    display:flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow:hidden;
+  }
+  .toggle button{
+    flex:1;
+    background: var(--panel-2);
+    color: var(--text-dim);
+    border:none;
+    padding: 10px 0;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 13px;
+    cursor:pointer;
+  }
+  .toggle button.active{
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .dropzone{
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 22px;
+    text-align:center;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor:pointer;
+    transition: border-color .15s;
+  }
+  .dropzone:hover{ border-color: var(--accent); }
+  .dropzone.has-file{ border-color: var(--accent); color: var(--text); }
+  input[type=file]{ display:none; }
+
+  button.primary{
+    width:100%;
+    margin-top: 8px;
+    background: var(--accent);
+    color: #08211c;
+    border:none;
+    border-radius: 6px;
+    padding: 13px 0;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size: 14px;
+    cursor:pointer;
+    letter-spacing: 0.01em;
+  }
+  button.primary:disabled{
+    opacity:0.45;
+    cursor:not-allowed;
+  }
+
+  pre#jsonPreview{
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    overflow:auto;
+    max-height: 220px;
+    margin:0;
+  }
+  pre#jsonPreview .k{ color: var(--accent); }
+
+  #log{
+    margin-top: 16px;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    max-height: 260px;
+    overflow-y:auto;
+  }
+  #log .line{ display:flex; gap:8px; }
+  #log .t{ color: var(--text-dim); flex-shrink:0; }
+  #log .ok{ color: var(--accent); }
+  #log .warn{ color: var(--warn); }
+  #log .err{ color: var(--err); }
+  #log a{ color: var(--accent); }
+
+  .hint{
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    line-height:1.5;
+  }
+  .badge{
+    display:inline-block;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">model<span>uploader</span></div>
+      <div class="sub">Open Cloud Assets API &middot; berjalan lokal di komputer kamu</div>
+    </div>
+    <span class="badge">localhost:3000</span>
+  </header>
+
+  <div class="grid">
+    <!-- FORM -->
+    <div class="panel">
+      <h2>01 &middot; Aset</h2>
+
+      <div class="field">
+        <label>File model (.rbxm / .rbxmx)</label>
+        <div class="dropzone" id="dropzone">Klik untuk pilih file, atau seret ke sini</div>
+        <input type="file" id="fileInput" accept=".rbxm,.rbxmx" />
+      </div>
+
+      <div class="field">
+        <label>Nama tampilan (Display Name)</label>
+        <input type="text" id="displayName" placeholder="Contoh: Pedang Api v2" />
+      </div>
+
+      <div class="field">
+        <label>Deskripsi</label>
+        <textarea id="description" placeholder="Deskripsi singkat aset ini"></textarea>
+      </div>
+
+      <h2 style="margin-top:28px;">02 &middot; Tujuan Upload</h2>
+
+      <div class="field">
+        <label>Upload sebagai</label>
+        <div class="toggle">
+          <button type="button" id="btnUser" class="active">User (Akun Pribadi)</button>
+          <button type="button" id="btnGroup">Group</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label id="idLabel">User ID</label>
+        <input type="text" id="creatorId" placeholder="Contoh: 1234567" />
+        <div class="hint" id="idHint">Lihat di URL profil: roblox.com/users/<b>1234567</b>/profile</div>
+      </div>
+
+      <h2 style="margin-top:28px;">03 &middot; Kredensial</h2>
+
+      <div class="field">
+        <label>Open Cloud API Key</label>
+        <input type="password" id="apiKey" placeholder="API key dari Creator Hub" />
+        <div class="hint">Key hanya dikirim ke server lokal di komputermu, tidak disimpan di mana pun.</div>
+      </div>
+
+      <button class="primary" id="uploadBtn">Upload ke Roblox</button>
+    </div>
+
+    <!-- PREVIEW + LOG -->
+    <div>
+      <div class="panel">
+        <h2>Request Preview</h2>
+        <pre id="jsonPreview">{}</pre>
+      </div>
+
+      <div class="panel" style="margin-top:24px;">
+        <h2>Status</h2>
+        <div id="log"><div class="line"><span class="t">&mdash;</span><span>Menunggu aksi&hellip;</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const displayName = document.getElementById('displayName');
+  const description = document.getElementById('description');
+  const btnUser = document.getElementById('btnUser');
+  const btnGroup = document.getElementById('btnGroup');
+  const creatorId = document.getElementById('creatorId');
+  const idLabel = document.getElementById('idLabel');
+  const idHint = document.getElementById('idHint');
+  const apiKey = document.getElementById('apiKey');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const jsonPreview = document.getElementById('jsonPreview');
+  const log = document.getElementById('log');
+
+  let creatorType = 'user';
+  let selectedFile = null;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('has-file'); });
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) handleFile(fileInput.files[0]);
+  });
+  function handleFile(f){
+    selectedFile = f;
+    dropzone.textContent = f.name + ' (' + Math.round(f.size/1024) + ' KB)';
+    dropzone.classList.add('has-file');
+    if (!displayName.value) displayName.value = f.name.replace(/\.(rbxm|rbxmx)$/i, '');
+    updatePreview();
+  }
+
+  btnUser.addEventListener('click', () => setCreatorType('user'));
+  btnGroup.addEventListener('click', () => setCreatorType('group'));
+  function setCreatorType(type){
+    creatorType = type;
+    btnUser.classList.toggle('active', type === 'user');
+    btnGroup.classList.toggle('active', type === 'group');
+    if (type === 'user') {
+      idLabel.textContent = 'User ID';
+      idHint.innerHTML = 'Lihat di URL profil: roblox.com/users/<b>1234567</b>/profile';
+    } else {
+      idLabel.textContent = 'Group ID';
+      idHint.innerHTML = 'Lihat di URL grup: roblox.com/groups/<b>7654321</b>/nama-grup';
+    }
+    updatePreview();
+  }
+
+  [displayName, description, creatorId].forEach(el => el.addEventListener('input', updatePreview));
+
+  function updatePreview(){
+    const payload = {
+      assetType: 'Model',
+      displayName: displayName.value || (selectedFile ? selectedFile.name : ''),
+      description: description.value || '',
+      creationContext: {
+        creator: creatorType === 'group'
+          ? { groupId: creatorId.value || '...' }
+          : { userId: creatorId.value || '...' }
+      },
+      file: selectedFile ? selectedFile.name : null
+    };
+    jsonPreview.textContent = JSON.stringify(payload, null, 2);
+  }
+  updatePreview();
+
+  function addLog(msg, cls){
+    const line = document.createElement('div');
+    line.className = 'line';
+    const time = new Date().toLocaleTimeString('id-ID', { hour12:false });
+    line.innerHTML = '<span class="t">' + time + '</span><span class="' + (cls||'') + '">' + msg + '</span>';
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return addLog('Pilih file .rbxm / .rbxmx terlebih dahulu.', 'err');
+    if (!apiKey.value) return addLog('Isi Open Cloud API Key.', 'err');
+    if (!creatorId.value) return addLog('Isi User ID / Group ID tujuan.', 'err');
+
+    uploadBtn.disabled = true;
+    log.innerHTML = '';
+    addLog('Mengirim aset ke Roblox Open Cloud&hellip;');
+
+    try {
+      const form = new FormData();
+      form.append('file', selectedFile);
+      form.append('apiKey', apiKey.value);
+      form.append('assetType', 'Model');
+      form.append('displayName', displayName.value || selectedFile.name);
+      form.append('description', description.value || '');
+      form.append('creatorType', creatorType);
+      form.append('creatorId', creatorId.value);
+
+      const res = await fetch('/api/upload', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (!res.ok) {
+        addLog('Gagal: ' + (data.error || 'Roblox menolak permintaan.'), 'err');
+        if (data.detail) addLog(JSON.stringify(data.detail), 'warn');
+        uploadBtn.disabled = false;
+        return;
+      }
+
+      addLog('Diterima. Roblox sedang memproses aset&hellip;', 'ok');
+      await pollOperation(data.path);
+    } catch (err) {
+      addLog('Kesalahan jaringan: ' + err.message, 'err');
+      uploadBtn.disabled = false;
+    }
+  });
+
+  async function pollOperation(opPath){
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const res = await fetch('/api/operation?opPath=' + encodeURIComponent(opPath), {
+          headers: { 'x-api-key': apiKey.value }
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          addLog('Gagal cek status: ' + (data.error || ''), 'err');
+          break;
+        }
+
+        if (data.done) {
+          if (data.response && data.response.assetId) {
+            const id = data.response.assetId;
+            addLog('Selesai! Asset ID: ' + id, 'ok');
+            addLog('Lihat: <a href="https://www.roblox.com/library/' + id + '" target="_blank">roblox.com/library/' + id + '</a>', 'ok');
+          } else if (data.error) {
+            addLog('Roblox menolak aset: ' + JSON.stringify(data.error), 'err');
+          } else {
+            addLog('Selesai, tapi respons tidak terduga: ' + JSON.stringify(data), 'warn');
+          }
+          uploadBtn.disabled = false;
+          return;
+        }
+        addLog('Masih diproses&hellip; (' + (i+1) + '/30)');
+      } catch (err) {
+        addLog('Kesalahan saat polling: ' + err.message, 'err');
+        break;
+      }
+    }
+    uploadBtn.disabled = false;
+  }
+</script>
+</body>
+</html>
