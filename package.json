@@ -1,0 +1,17 @@
+{
+  "name": "roblox-model-uploader",
+  "version": "1.0.0",
+  "description": "Tool lokal untuk upload file Model Roblox (.rbxm/.rbxmx) ke Roblox Creator lewat Open Cloud Assets API.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
