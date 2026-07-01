@@ -34,16 +34,27 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
       creationContext: { creator },
     };
 
-    // Roblox mewajibkan MIME type spesifik untuk file rbxm/rbxmx,
+    // Roblox mewajibkan MIME type spesifik sesuai jenis aset dan ekstensi file.
     // "application/octet-stream" generik akan ditolak.
     const ext = path.extname(req.file.originalname).toLowerCase();
-    const mimeMap = {
-      ".rbxm": "model/x-rbxm",
-      ".rbxmx": "model/x-rbxmx",
+
+    const mimeByType = {
+      Model: { ".rbxm": "model/x-rbxm", ".rbxmx": "model/x-rbxmx" },
+      Animation: { ".rbxm": "model/x-rbxm", ".rbxmx": "model/x-rbxmx" },
+      Audio: { ".mp3": "audio/mpeg", ".ogg": "audio/ogg" },
     };
-    const contentType = mimeMap[ext];
+
+    const allowedForType = mimeByType[requestPayload.assetType];
+    if (!allowedForType) {
+      return res.status(400).json({ error: "assetType tidak dikenali." });
+    }
+
+    const contentType = allowedForType[ext];
     if (!contentType) {
-      return res.status(400).json({ error: "File harus berformat .rbxm atau .rbxmx." });
+      const allowedExts = Object.keys(allowedForType).join(", ");
+      return res.status(400).json({
+        error: "Ekstensi file tidak didukung untuk jenis aset " + requestPayload.assetType + ". Gunakan: " + allowedExts,
+      });
     }
 
     const form = new FormData();
