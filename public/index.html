@@ -114,7 +114,7 @@
     border:none;
     padding: 10px 0;
     font-family:'JetBrains Mono', monospace;
-    font-size: 13px;
+    font-size: 12.5px;
     cursor:pointer;
   }
   .toggle button.active{
@@ -155,6 +155,20 @@
     cursor:not-allowed;
   }
 
+  button.ghost{
+    width:100%;
+    margin-top: 10px;
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 0;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12px;
+    cursor:pointer;
+  }
+  button.ghost:hover{ color: var(--err); border-color: var(--err); }
+
   pre#jsonPreview{
     background: var(--panel-2);
     border: 1px solid var(--border);
@@ -167,7 +181,6 @@
     max-height: 220px;
     margin:0;
   }
-  pre#jsonPreview .k{ color: var(--accent); }
 
   #log{
     margin-top: 16px;
@@ -199,6 +212,28 @@
     border: 1px solid var(--border);
     color: var(--text-dim);
   }
+  .badge.saved{ color: var(--accent); border-color: var(--accent-dim); }
+
+  .typeGrid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .typeGrid button{
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    padding: 10px 4px;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12px;
+    cursor:pointer;
+  }
+  .typeGrid button.active{
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -206,20 +241,28 @@
   <header>
     <div>
       <div class="brand">model<span>uploader</span></div>
-      <div class="sub">Open Cloud Assets API &middot; berjalan lokal di komputer kamu</div>
+      <div class="sub">Open Cloud Assets API &middot; Model &middot; Animation &middot; Audio</div>
     </div>
-    <span class="badge">localhost:3000</span>
+    <span class="badge" id="savedBadge">belum ada data tersimpan</span>
   </header>
 
   <div class="grid">
     <!-- FORM -->
     <div class="panel">
-      <h2>01 &middot; Aset</h2>
+      <h2>01 &middot; Jenis Aset</h2>
+      <div class="field">
+        <div class="typeGrid">
+          <button type="button" id="typeModel" class="active">Model</button>
+          <button type="button" id="typeAnimation">Animation</button>
+          <button type="button" id="typeAudio">Audio</button>
+        </div>
+      </div>
 
       <div class="field">
-        <label>File model (.rbxm / .rbxmx)</label>
+        <label id="fileLabel">File (.rbxm / .rbxmx)</label>
         <div class="dropzone" id="dropzone">Klik untuk pilih file, atau seret ke sini</div>
         <input type="file" id="fileInput" accept=".rbxm,.rbxmx" />
+        <div class="hint" id="fileHint">Model &amp; Animation memakai file hasil export dari Roblox Studio (.rbxm/.rbxmx).</div>
       </div>
 
       <div class="field">
@@ -253,10 +296,11 @@
       <div class="field">
         <label>Open Cloud API Key</label>
         <input type="password" id="apiKey" placeholder="API key dari Creator Hub" />
-        <div class="hint">Key hanya dikirim ke server lokal di komputermu, tidak disimpan di mana pun.</div>
+        <div class="hint">Key disimpan di browser HP/komputer kamu sendiri (localStorage), tidak dikirim ke mana pun selain server ini &amp; Roblox.</div>
       </div>
 
       <button class="primary" id="uploadBtn">Upload ke Roblox</button>
+      <button class="ghost" id="clearBtn">Lupakan data tersimpan di perangkat ini</button>
     </div>
 
     <!-- PREVIEW + LOG -->
@@ -275,8 +319,12 @@
 </div>
 
 <script>
+  const STORAGE_KEY = 'roblox_uploader_prefs_v1';
+
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
+  const fileLabel = document.getElementById('fileLabel');
+  const fileHint = document.getElementById('fileHint');
   const displayName = document.getElementById('displayName');
   const description = document.getElementById('description');
   const btnUser = document.getElementById('btnUser');
@@ -286,12 +334,91 @@
   const idHint = document.getElementById('idHint');
   const apiKey = document.getElementById('apiKey');
   const uploadBtn = document.getElementById('uploadBtn');
+  const clearBtn = document.getElementById('clearBtn');
   const jsonPreview = document.getElementById('jsonPreview');
   const log = document.getElementById('log');
+  const savedBadge = document.getElementById('savedBadge');
+
+  const typeButtons = {
+    Model: document.getElementById('typeModel'),
+    Animation: document.getElementById('typeAnimation'),
+    Audio: document.getElementById('typeAudio'),
+  };
+
+  const TYPE_CONFIG = {
+    Model:     { accept: '.rbxm,.rbxmx', label: 'File (.rbxm / .rbxmx)', hint: 'Export dari Roblox Studio: klik kanan model &rarr; Export Selection.' },
+    Animation: { accept: '.rbxm,.rbxmx', label: 'File Animation (.rbxm / .rbxmx)', hint: 'Export animasi dari Roblox Studio sebagai .rbxm.' },
+    Audio:     { accept: '.mp3,.ogg',    label: 'File Audio (.mp3 / .ogg)', hint: 'Format yang didukung Roblox: MP3 atau OGG.' },
+  };
 
   let creatorType = 'user';
+  let assetType = 'Model';
   let selectedFile = null;
 
+  // ---------- Simpan & muat preferensi dari localStorage ----------
+  function loadPrefs(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const prefs = JSON.parse(raw);
+      if (prefs.apiKey) apiKey.value = prefs.apiKey;
+      if (prefs.creatorId) creatorId.value = prefs.creatorId;
+      if (prefs.creatorType) setCreatorType(prefs.creatorType, true);
+      if (prefs.assetType) setAssetType(prefs.assetType, true);
+      if (prefs.apiKey || prefs.creatorId) {
+        savedBadge.textContent = 'data tersimpan dimuat';
+        savedBadge.classList.add('saved');
+      }
+    } catch (e) { /* abaikan kalau data korup */ }
+  }
+
+  function savePrefs(){
+    const prefs = {
+      apiKey: apiKey.value,
+      creatorId: creatorId.value,
+      creatorType,
+      assetType,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    savedBadge.textContent = 'tersimpan di perangkat ini';
+    savedBadge.classList.add('saved');
+  }
+
+  [apiKey, creatorId].forEach(el => el.addEventListener('input', () => { savePrefs(); updatePreview(); }));
+
+  clearBtn.addEventListener('click', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    apiKey.value = '';
+    creatorId.value = '';
+    savedBadge.textContent = 'belum ada data tersimpan';
+    savedBadge.classList.remove('saved');
+    addLog('Data tersimpan di perangkat ini sudah dihapus.', 'warn');
+    updatePreview();
+  });
+
+  // ---------- Jenis aset ----------
+  function setAssetType(type, silent){
+    assetType = type;
+    Object.keys(typeButtons).forEach(k => typeButtons[k].classList.toggle('active', k === type));
+    const cfg = TYPE_CONFIG[type];
+    fileInput.accept = cfg.accept;
+    fileLabel.textContent = cfg.label;
+    fileHint.innerHTML = cfg.hint;
+    // reset file yang sudah dipilih kalau ganti jenis, biar ga ketuker ekstensi
+    if (!silent) {
+      selectedFile = null;
+      fileInput.value = '';
+      dropzone.textContent = 'Klik untuk pilih file, atau seret ke sini';
+      dropzone.classList.remove('has-file');
+    }
+    if (!silent) savePrefs();
+    updatePreview();
+  }
+  typeButtons.Model.addEventListener('click', () => setAssetType('Model'));
+  typeButtons.Animation.addEventListener('click', () => setAssetType('Animation'));
+  typeButtons.Audio.addEventListener('click', () => setAssetType('Audio'));
+
+  // ---------- File ----------
   dropzone.addEventListener('click', () => fileInput.click());
   dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('has-file'); });
   dropzone.addEventListener('drop', e => {
@@ -308,13 +435,14 @@
     selectedFile = f;
     dropzone.textContent = f.name + ' (' + Math.round(f.size/1024) + ' KB)';
     dropzone.classList.add('has-file');
-    if (!displayName.value) displayName.value = f.name.replace(/\.(rbxm|rbxmx)$/i, '');
+    if (!displayName.value) displayName.value = f.name.replace(/\.[^.]+$/i, '');
     updatePreview();
   }
 
+  // ---------- Target upload ----------
   btnUser.addEventListener('click', () => setCreatorType('user'));
   btnGroup.addEventListener('click', () => setCreatorType('group'));
-  function setCreatorType(type){
+  function setCreatorType(type, silent){
     creatorType = type;
     btnUser.classList.toggle('active', type === 'user');
     btnGroup.classList.toggle('active', type === 'group');
@@ -325,14 +453,15 @@
       idLabel.textContent = 'Group ID';
       idHint.innerHTML = 'Lihat di URL grup: roblox.com/groups/<b>7654321</b>/nama-grup';
     }
+    if (!silent) savePrefs();
     updatePreview();
   }
 
-  [displayName, description, creatorId].forEach(el => el.addEventListener('input', updatePreview));
+  [displayName, description].forEach(el => el.addEventListener('input', updatePreview));
 
   function updatePreview(){
     const payload = {
-      assetType: 'Model',
+      assetType: assetType,
       displayName: displayName.value || (selectedFile ? selectedFile.name : ''),
       description: description.value || '',
       creationContext: {
@@ -344,7 +473,6 @@
     };
     jsonPreview.textContent = JSON.stringify(payload, null, 2);
   }
-  updatePreview();
 
   function addLog(msg, cls){
     const line = document.createElement('div');
@@ -356,19 +484,19 @@
   }
 
   uploadBtn.addEventListener('click', async () => {
-    if (!selectedFile) return addLog('Pilih file .rbxm / .rbxmx terlebih dahulu.', 'err');
+    if (!selectedFile) return addLog('Pilih file terlebih dahulu.', 'err');
     if (!apiKey.value) return addLog('Isi Open Cloud API Key.', 'err');
     if (!creatorId.value) return addLog('Isi User ID / Group ID tujuan.', 'err');
 
     uploadBtn.disabled = true;
     log.innerHTML = '';
-    addLog('Mengirim aset ke Roblox Open Cloud&hellip;');
+    addLog('Mengirim ' + assetType.toLowerCase() + ' ke Roblox Open Cloud&hellip;');
 
     try {
       const form = new FormData();
       form.append('file', selectedFile);
       form.append('apiKey', apiKey.value);
-      form.append('assetType', 'Model');
+      form.append('assetType', assetType);
       form.append('displayName', displayName.value || selectedFile.name);
       form.append('description', description.value || '');
       form.append('creatorType', creatorType);
@@ -427,6 +555,10 @@
     }
     uploadBtn.disabled = false;
   }
+
+  // init
+  loadPrefs();
+  updatePreview();
 </script>
 </body>
 </html>
