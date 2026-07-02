@@ -118,6 +118,70 @@ app.get("/api/operation", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Deteksi grup yang dimiliki/dikelola user, filter yang rolenya Owner/Admin/Developer
+app.get("/api/groups", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "userId wajib diisi." });
+
+    const robloxRes = await fetch(
+      `https://groups.roblox.com/v2/users/${encodeURIComponent(userId)}/groups/roles`
+    );
+    const data = await robloxRes.json();
+
+    if (!robloxRes.ok) {
+      return res.status(robloxRes.status).json({
+        error: data.errors?.[0]?.message || "Gagal mengambil daftar grup dari Roblox.",
+        detail: data,
+      });
+    }
+
+    const KEYWORDS = /owner|admin|developer|creator|manager/i;
+    const all = (data.data || []).map((entry) => ({
+      id: entry.group.id,
+      name: entry.group.name,
+      roleName: entry.role.name,
+      rank: entry.role.rank,
+    }));
+
+    const eligible = all.filter((g) => KEYWORDS.test(g.roleName) || g.rank >= 200);
+
+    res.json({ groups: eligible, allGroups: all });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || "Terjadi kesalahan pada server lokal." });
+  }
+});
+
+// Cek status moderasi sebuah aset berdasarkan Asset ID
+app.get("/api/asset-status", async (req, res) => {
+  try {
+    const { assetId } = req.query;
+    const apiKey = req.headers["x-api-key"];
+
+    if (!apiKey) return res.status(400).json({ error: "API Key wajib diisi." });
+    if (!assetId) return res.status(400).json({ error: "assetId wajib diisi." });
+
+    const robloxRes = await fetch(`https://apis.roblox.com/assets/v1/assets/${assetId}`, {
+      headers: { "x-api-key": apiKey },
+    });
+    const data = await robloxRes.json();
+
+    if (!robloxRes.ok) {
+      return res.status(robloxRes.status).json({
+        error: data.message || "Gagal memeriksa status aset.",
+        detail: data,
+      });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || "Terjadi kesalahan pada server lokal." });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n✔ Roblox Model Uploader berjalan di http://localhost:${PORT}\n`);
 });
